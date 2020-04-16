@@ -2,10 +2,11 @@ import json
 import ntpath
 import tkinter
 from tkinter import filedialog, simpledialog
-import time_entry
 
 import ics
 
+import invoice
+import time_entry
 from debitoor_client import DebitoorClient
 
 
@@ -24,8 +25,10 @@ class AutoInvoice:
         }
         self.settings = {
             "accessToken": "",
-            "serviceName": "Unverpackt Website Entwicklung",
-            "entriesPerInvoice": 10
+            "serviceName": "Dienstleistung Entwicklung",
+            "customerId": "5e97dcd2c223eb0023c58ada",
+            "entriesPerInvoice": 10,
+            "hourlyRate": 30.0
         }
 
         self.load_config()
@@ -43,6 +46,7 @@ class AutoInvoice:
 
         self.create_debitoor_auth(root)
         self.create_ics_file_select(root)
+        self.create_invoices_button(root)
 
         root.mainloop()
 
@@ -129,6 +133,22 @@ class AutoInvoice:
         ics_file_dialog_button.pack(side=tkinter.RIGHT)
         ics_file_info = tkinter.Label(frame, textvariable=self.file_info)
         ics_file_info.pack(side=tkinter.BOTTOM)
+
+    def create_invoices_button(self, parent):
+        def create_invoices():
+            if len(self.time_entries) < 1:
+                return
+
+            invoices = invoice.create_invoices(self.time_entries, self.settings)
+
+            for inv in invoices:
+                self.api_client.create_invoice_draft(inv)
+
+        frame = tkinter.Frame(parent)
+        frame.pack(fill=tkinter.X, padx=5, pady=5)
+
+        button = tkinter.Button(frame, text="Create invoices", command=create_invoices)
+        button.pack()
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@ import ics
 
 class TimeEntry:
     def __init__(self, date, start: float, end: float):
-        self.date = date
+        self.date: arrow.Arrow = date
         self.start = start
         self.end = end
         self.duration = end - start
@@ -28,6 +28,8 @@ def create_time_entry(date: arrow.Arrow, start_hour: int, start_minute: int, end
 
     start = start_hour + (start_minute / 60.0)
     end = end_hour + (end_minute / 60.0)
+
+    print(str(start_hour) + ":" + str(start_minute) + " -> " + str(end_hour) + ":" + str(end_minute))
 
     return [TimeEntry(date, start, end)]
 
