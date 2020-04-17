@@ -34,7 +34,7 @@ class InvoiceEntry:
             #"unitGrossPrice": float("{:10.2f}".format(self.hourly_rate)),
             "unitNetPrice": float("{:10.2f}".format(self.hourly_rate)),
             "unitId": self.unit_type,
-            "taxEnabled": True,
+            "taxEnabled": False,
             "taxRate": 0
         }
 
