@@ -62,7 +62,11 @@ def create_invoices(time_entries, settings):
 
     invoices = []
 
+    def sort_time_entries(value):
+        return value.date
+
     for month_key in sorted_time_entries:
+        sorted_time_entries[month_key].sort(key=sort_time_entries)
         invoices.append(create_invoice(sorted_time_entries[month_key], settings))
 
     for inv in invoices:
