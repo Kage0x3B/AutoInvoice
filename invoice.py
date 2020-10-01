@@ -34,8 +34,8 @@ class InvoiceEntry:
             #"unitGrossPrice": float("{:10.2f}".format(self.hourly_rate)),
             "unitNetPrice": float("{:10.2f}".format(self.hourly_rate)),
             "unitId": self.unit_type,
-            "taxEnabled": False,
-            "taxRate": 0
+            "taxEnabled": True,
+            "taxRate": 16
         }
 
 
@@ -44,7 +44,7 @@ def create_invoice(time_entries, settings):
 
     for entry in time_entries:
         invoice_entries.append(
-            InvoiceEntry(settings["serviceName"], entry.date, entry.duration, settings["hourlyRate"]))
+            InvoiceEntry(settings["serviceName"], entry.date, entry.duration, entry.hourly_rate))
 
     return Invoice(settings["customerId"], invoice_entries)
 

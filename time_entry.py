@@ -3,18 +3,19 @@ import ics
 
 
 class TimeEntry:
-    def __init__(self, date, start: float, end: float):
+    def __init__(self, date, start: float, end: float, hourly_rate: float):
         self.date: arrow.Arrow = date
         self.start = start
         self.end = end
         self.duration = end - start
-        print(str(start) + " -> " + str(end) + ": " + str(self.duration))
+        self.hourly_rate = hourly_rate
+        print(str(start) + " -> " + str(end) + "= " + str(self.duration)+ " x "+ str(hourly_rate))
 
     def __repr__(self):
         return "TimeEntry(date=" + self.date.format() + ", duration=" + str(self.duration) + ")"
 
 
-def create_time_entry(date: arrow.Arrow, start_hour: int, start_minute: int, end_hour: int, end_minute: int):
+def create_time_entry(date: arrow.Arrow, start_hour: int, start_minute: int, end_hour: int, end_minute: int, hourly_rate: float):
     if end_hour == 0 and end_minute == 0:
         end_hour = 24
 
@@ -23,15 +24,15 @@ def create_time_entry(date: arrow.Arrow, start_hour: int, start_minute: int, end
         print(date)
         print(str(start_hour) + ":" + str(start_minute))
         print(str(end_hour) + ":" + str(end_minute))
-        return [create_time_entry(date, start_hour, start_minute, 24, 0)[0],
-                create_time_entry(date.shift(days=1), 0, 0, end_hour, end_minute)[0]]
+        return [create_time_entry(date, start_hour, start_minute, 24, 0, hourly_rate)[0],
+                create_time_entry(date.shift(days=1), 0, 0, end_hour, end_minute, hourly_rate)[0]]
 
     start = start_hour + (start_minute / 60.0)
     end = end_hour + (end_minute / 60.0)
 
-    print(str(start_hour) + ":" + str(start_minute) + " -> " + str(end_hour) + ":" + str(end_minute))
+    #print(str(start_hour) + ":" + str(start_minute) + " -> " + str(end_hour) + ":" + str(end_minute))
 
-    return [TimeEntry(date, start, end)]
+    return [TimeEntry(date, start, end, hourly_rate)]
 
 
 def parse_time_string(time_str: str):
@@ -40,7 +41,7 @@ def parse_time_string(time_str: str):
     return int(time_split[0]), int(time_split[1])
 
 
-def parse_work_times(data: set):
+def parse_work_times(data: set, hourly_rate: float):
     time_entry_list = []
 
     for time_entry in data:
@@ -61,6 +62,6 @@ def parse_work_times(data: set):
         (start_hour, start_minute) = parse_time_string(start_time)
         (end_hour, end_minute) = parse_time_string(end_time)
 
-        time_entry_list.extend(create_time_entry(time_entry.due, start_hour, start_minute, end_hour, end_minute))
+        time_entry_list.extend(create_time_entry(time_entry.due, start_hour, start_minute, end_hour, end_minute, hourly_rate))
 
     return time_entry_list

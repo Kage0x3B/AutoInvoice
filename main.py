@@ -1,8 +1,6 @@
 import json
 import ntpath
-import tkinter
-from tkinter import filedialog, simpledialog
-
+import argparse
 import ics
 
 import invoice
@@ -33,22 +31,17 @@ class AutoInvoice:
 
         self.load_config()
 
-        self.api_client = DebitoorClient(self.api_config["clientId"], self.api_config["clientSecret"])
+        self.api_client = DebitoorClient(
+            self.api_config["clientId"], self.api_config["clientSecret"])
 
         if self.settings["accessToken"]:
             try:
                 self.api_client.use_access_token(self.settings["accessToken"])
                 self.auth_success = True
+                print("[+] You are authenticated")
             except:
+                print("[-] You are not authenticated")
                 pass
-
-        root = tkinter.Tk()
-
-        self.create_debitoor_auth(root)
-        self.create_ics_file_select(root)
-        self.create_invoices_button(root)
-
-        root.mainloop()
 
     def load_config(self):
         with open("api.json", "r") as f:
@@ -62,8 +55,6 @@ class AutoInvoice:
             settings_file.write(json.dumps(self.settings))
 
     def retrieve_access_token(self, parent):
-        self.api_client.open_oauth_page()
-        oauth_code = simpledialog.askstring("Authorize AutoInvoice", "Authentication code: ")
         access_token = self.api_client.request_access_token(oauth_code)
 
         if access_token:
@@ -72,84 +63,54 @@ class AutoInvoice:
 
             self.auth_success = True
             self.auth_status.set("Authorized")
-            self.auth_button["state"] = tkinter.DISABLED
-
-    def show_ics_file_dialog(self, parent):
-        ics_filename = filedialog.askopenfilename(parent=parent, initialdir=".", title="Select exported iCalendar file",
-                                                  filetypes=(("iCalendar files", "*.ics"), ("All files", "*.*")))
-
-        if ics_filename:
-            with open(ics_filename, "r") as ics_file:
-                c = ics.Calendar(ics_file.read())
-            print(c.todos)
-            print(ics_file)
-
-            name = "time list"
-
-            for extra in c.extra:
-                if str(extra).startswith("X-WR-CALNAME:"):
-                    name = str(extra)[13:]
-
-            self.loaded_filename.set(ntpath.basename(ics_filename))
-            self.file_info.set("Loaded " + name + " with " + str(len(c.todos)) + " entries")
-
-            self.time_entries = time_entry.parse_work_times(c.todos)
 
     def create_debitoor_auth(self, parent):
-        self.auth_status = tkinter.StringVar(parent, "Debitoor access pending...")
 
         def on_authorize_click():
             self.retrieve_access_token(parent)
 
-        frame = tkinter.Frame(parent)
-        frame.pack(fill=tkinter.X, padx=5, pady=5)
-
-        auth_info = tkinter.Label(frame, textvariable=self.auth_status)
-        auth_info.pack(side=tkinter.TOP)
-
-        self.auth_button = tkinter.Button(frame, text="Authorize", command=on_authorize_click)
-
         if self.auth_success:
             self.auth_status.set("Authorized")
-            self.auth_button["state"] = tkinter.DISABLED
 
-        self.auth_button.pack(side=tkinter.BOTTOM)
+    def read_file(self, filename, hourly_rate):
+            if filename:
+                with open(filename, "r") as ics_file:
+                    c = ics.Calendar(ics_file.read())
+                    print(c.todos)
+                    print(ics_file)
 
-    def create_ics_file_select(self, parent):
-        self.file_info = tkinter.StringVar(parent, "No file loaded")
-        self.loaded_filename = tkinter.StringVar(parent, "")
+                    name = "time list"
 
-        def on_open_click():
-            self.show_ics_file_dialog(parent)
+                    for extra in c.extra:
+                        if str(extra).startswith("X-WR-CALNAME:"):
+                            name = str(extra)[13:]
 
-        frame = tkinter.Frame(parent)
-        frame.pack(fill=tkinter.X, padx=5, pady=5)
-        top_frame = tkinter.Frame(frame)
-        top_frame.pack(side=tkinter.TOP)
+                    self.time_entries += time_entry.parse_work_times(c.todos, hourly_rate)
 
-        ics_file_entry = tkinter.Entry(top_frame, state=tkinter.DISABLED, textvariable=self.loaded_filename)
-        ics_file_entry.pack(side=tkinter.LEFT, padx=5)
-        ics_file_dialog_button = tkinter.Button(top_frame, text="Open file", command=on_open_click)
-        ics_file_dialog_button.pack(side=tkinter.RIGHT)
-        ics_file_info = tkinter.Label(frame, textvariable=self.file_info)
-        ics_file_info.pack(side=tkinter.BOTTOM)
+    def create(self):
+        if len(self.time_entries) < 1:
+                        return
 
-    def create_invoices_button(self, parent):
-        def create_invoices():
-            if len(self.time_entries) < 1:
-                return
+        invoices=invoice.create_invoices(self.time_entries, self.settings)
 
-            invoices = invoice.create_invoices(self.time_entries, self.settings)
-
-            for inv in invoices:
-                self.api_client.create_invoice_draft(inv)
-
-        frame = tkinter.Frame(parent)
-        frame.pack(fill=tkinter.X, padx=5, pady=5)
-
-        button = tkinter.Button(frame, text="Create invoices", command=create_invoices)
-        button.pack()
-
+        for inv in invoices:
+            self.api_client.create_invoice_draft(inv)
+            
 
 if __name__ == '__main__':
-    AutoInvoice()
+    parser=argparse.ArgumentParser(description = 'Auto create invoices')
+    parser.add_argument('-f','--file', action='append', help='<Required> Set flag', required=True)
+    parser.add_argument('-r','--rate', action='append', help='<Required> Set flag', required=True)
+
+
+    args=parser.parse_args()
+
+    if (len(args.file) != len(args.rate)):
+        print("Multiple -f tags need the same amount of -r (Rate) tags for each file")
+    else:
+        auto = AutoInvoice()
+        for file,rate in zip(args.file, args.rate):
+            auto.read_file(file, float(rate))
+
+        auto.create()
+            
