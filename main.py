@@ -9,13 +9,14 @@ from debitoor_client import DebitoorClient
 
 
 class AutoInvoice:
-    def __init__(self):
+    def __init__(self, mode):
         self.auth_success = False
         self.auth_status = None
         self.auth_button = None
         self.file_info = None
         self.loaded_filename = None
         self.time_entries = []
+        self.mode = mode
 
         self.api_config = {
             "clientId": "",
@@ -28,20 +29,20 @@ class AutoInvoice:
             "entriesPerInvoice": 10,
             "hourlyRate": 30.0
         }
+        if (self.mode !="timeonly"):
+            self.load_config()
 
-        self.load_config()
+            self.api_client = DebitoorClient(
+                self.api_config["clientId"], self.api_config["clientSecret"])
 
-        self.api_client = DebitoorClient(
-            self.api_config["clientId"], self.api_config["clientSecret"])
-
-        if self.settings["accessToken"]:
-            try:
-                self.api_client.use_access_token(self.settings["accessToken"])
-                self.auth_success = True
-                print("[+] You are authenticated")
-            except:
-                print("[-] You are not authenticated")
-                pass
+            if self.settings["accessToken"]:
+                try:
+                    self.api_client.use_access_token(self.settings["accessToken"])
+                    self.auth_success = True
+                    print("[+] You are authenticated")
+                except:
+                    print("[-] You are not authenticated")
+                    pass
 
     def load_config(self):
         with open("api.json", "r") as f:
@@ -85,30 +86,50 @@ class AutoInvoice:
                         if str(extra).startswith("X-WR-CALNAME:"):
                             name = str(extra)[13:]
 
-                    self.time_entries += time_entry.parse_work_times(c.todos, hourly_rate)
+                    self.time_entries += time_entry.parse_work_times(
+                        c.todos, hourly_rate)
+
+    def calculate(self):
+        time = 0
+        if len(self.time_entries) < 1:
+            return 
+        for entry in self.time_entries:
+            time += entry.duration
+        print("Du hast "+str(time)+" Stunden in der ICS Datei!")
 
     def create(self):
         if len(self.time_entries) < 1:
                         return
 
-        invoices=invoice.create_invoices(self.time_entries, self.settings)
+        invoices = invoice.create_invoices(self.time_entries, self.settings)
 
         for inv in invoices:
             self.api_client.create_invoice_draft(inv)
-            
+
 
 if __name__ == '__main__':
-    parser=argparse.ArgumentParser(description = 'Auto create invoices')
-    parser.add_argument('-f','--file', action='append', help='<Required> Set flag', required=True)
-    parser.add_argument('-r','--rate', action='append', help='<Required> Set flag', required=True)
+    parser = argparse.ArgumentParser(description='Auto create invoices')
+    parser.add_argument('-t', '--timeonly', action='store_true',
+                        help='<Required> Set flag', required=False)
 
+    parser.add_argument('-f', '--file', action='append',
+                        help='<Required> Set flag', required=True)
+    parser.add_argument('-r', '--rate', action='append',
+                        help='Set flag', required=False)
 
-    args=parser.parse_args()
+    args = parser.parse_args()
+    if (args.timeonly):
+       auto = AutoInvoice(mode="timeonly")
+       for file in args.file:
+            auto.read_file(file, float(1.0))
 
-    if (len(args.file) != len(args.rate)):
+       auto.calculate() 
+
+    elif(len(args.file) != len(args.rate) and len(args.file) > 1):
         print("Multiple -f tags need the same amount of -r (Rate) tags for each file")
+
     else:
-        auto = AutoInvoice()
+        auto = AutoInvoice(mode="unset")
         for file,rate in zip(args.file, args.rate):
             auto.read_file(file, float(rate))
 
